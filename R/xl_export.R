@@ -11,6 +11,12 @@
 #' @importFrom openxlsx createWorkbook addWorksheet writeData createStyle addStyle setColWidths saveWorkbook
 #' @export
 xl_export <- function(data, filename, sheet_name = "Table") {
+  # --- 1. Input Checks ---
+  check_df(data)
+  check_string(filename)
+  check_string(sheet_name)
+
+  # --- 2. Export Logic ---
   wb <- createWorkbook()
   addWorksheet(wb, sheet_name)
 
