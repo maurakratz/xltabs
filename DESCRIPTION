@@ -1,13 +1,22 @@
 Package: xltabs
-Title: What the Package Does (One Line, Title Case)
+Title: Create Stata-style Tables for Export to Excel 
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person(given = "Maura", 
+           family = "Kratz", 
+           email = "kratz.maura@gmail.com", 
+           role = c("aut", "cre"))
+Description: Generates data frames representing frequency tables or cross- tabulations with customisable counts, row and column totals, missing values, weights, and percentages. Designed for export to Excel, the output mimics the visual layout of Stata tables by combining counts and percentages into a single cell using line breaks. 
+License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 URL: https://github.com/maurakratz/xltabs
 BugReports: https://github.com/maurakratz/xltabs/issues
+Imports: 
+    dplyr,
+    forcats,
+    openxlsx,
+    rlang,
+    scales,
+    tidyr
