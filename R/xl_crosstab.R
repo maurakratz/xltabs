@@ -1,6 +1,6 @@
 #' Create Stata-style Cross Tables for Export to Excel
 #'
-#' Generates a data frame representing a cross table with counts and percentages (row, col, total),
+#' Generates a data frame representing a cross-tabulation with counts and percentages (row, col, total),
 #' formatted as a single string per cell for easy export into Excel workbooks.
 #' Handles 2-way and 3-way tables, weights, and missing values.
 #' Allows toggling of row/column totals, as well as the visibility of counts,
@@ -201,35 +201,4 @@ xl_crosstab <- function(data,
     )
 
   return(df_pivoted)
-}
-
-#' Export formatted Crosstabs to Excel
-#'
-#' Writes the data frame to an Excel file with text wrapping and top alignment enabled.
-#'
-#' @param data The data frame from \code{xl_crosstab}.
-#' @param filename String. Path to the output file (.xlsx).
-#' @param sheet_name String. Name of the Excel sheet. Default "Crosstab".
-#'
-#' @importFrom openxlsx createWorkbook addWorksheet writeData createStyle addStyle setColWidths saveWorkbook
-#' @export
-export_formatted_xlsx <- function(data, filename, sheet_name = "Crosstab") {
-  wb <- createWorkbook()
-  addWorksheet(wb, sheet_name)
-
-  writeData(wb, sheet_name, data)
-
-  my_style <- createStyle(
-    valign = "top",
-    wrapText = TRUE
-  )
-
-  addStyle(wb, sheet_name, style = my_style,
-    rows = 1:(nrow(data) + 1),
-    cols = 1:ncol(data),
-    gridExpand = TRUE)
-
-  setColWidths(wb, sheet_name, cols = 1:ncol(data), widths = 15)
-
-  saveWorkbook(wb, filename, overwrite = TRUE)
 }
