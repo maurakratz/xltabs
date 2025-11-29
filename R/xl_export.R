@@ -1,4 +1,4 @@
-#' Export Dataframes to Excel
+#' Export Data Frames to Excel
 #'
 #' Writes the data frame (cross-tabulation or frequency table) to an Excel file
 #' with text wrapping and top alignment enabled. This ensures that the

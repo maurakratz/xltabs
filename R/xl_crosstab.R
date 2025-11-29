@@ -41,7 +41,18 @@ xl_crosstab <- function(data,
                         show_tot_pct = TRUE,
                         show_na = FALSE,
                         na_label = "Missing") {
+  # --- 1. Input Checks ---
+  check_df(data)
+  check_bool(add_total_row)
+  check_bool(add_total_col)
+  check_bool(show_n)
+  check_bool(show_row_pct)
+  check_bool(show_col_pct)
+  check_bool(show_tot_pct)
+  check_bool(show_na)
+  check_string(na_label)
 
+  # --- Variablen einfangen ---
   r_sym <- enquo(row_var)
   c_sym <- enquo(col_var)
   s_sym <- enquo(strat_var)

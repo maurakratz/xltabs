@@ -51,7 +51,7 @@ xl_crosstab(
 A data frame in wide format, ready for Excel export.
 }
 \description{
-Generates a data frame representing a cross table with counts and percentages (row, col, total),
+Generates a data frame representing a cross-tabulation with counts and percentages (row, col, total),
 formatted as a single string per cell for easy export into Excel workbooks.
 Handles 2-way and 3-way tables, weights, and missing values.
 Allows toggling of row/column totals, as well as the visibility of counts,

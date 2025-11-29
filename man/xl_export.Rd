@@ -2,7 +2,7 @@
 % Please edit documentation in R/xl_export.R
 \name{xl_export}
 \alias{xl_export}
-\title{Export Dataframes to Excel}
+\title{Export Data Frames to Excel}
 \usage{
 xl_export(data, filename, sheet_name = "Table")
 }
@@ -14,7 +14,7 @@ xl_export(data, filename, sheet_name = "Table")
 \item{sheet_name}{String. Name of the Excel sheet. Default "Table".}
 }
 \description{
-Writes the data frame (cross table or frequency table) to an Excel file
+Writes the data frame (cross-tabulation or frequency table) to an Excel file
 with text wrapping and top alignment enabled. This ensures that the
 stacked cell content (Counts and Percentages) is displayed correctly.
 }

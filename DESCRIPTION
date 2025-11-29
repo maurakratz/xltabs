@@ -14,8 +14,10 @@ RoxygenNote: 7.3.3
 URL: https://github.com/maurakratz/xltabs
 BugReports: https://github.com/maurakratz/xltabs/issues
 Imports: 
+    cli,
     dplyr,
     forcats,
+    magrittr,
     openxlsx,
     rlang,
     scales,
