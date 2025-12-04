@@ -35,6 +35,20 @@
 #' @importFrom scales percent
 #' @importFrom openxlsx createWorkbook addWorksheet writeData createStyle addStyle setColWidths saveWorkbook
 #' @import rlang
+#' @examples
+#' # 1. Create dummy data
+#' df <- data.frame(
+#'   edu = c("High", "Low", "High", "Low", "High"),
+#'   job = c("Yes", "No", "Yes", "Yes", "No"),
+#'   weight = c(1, 1.2, 0.8, 1, 1)
+#' )
+#'
+#' # 2. Simple crosstab
+#' xl_crosstab(df, edu, job)
+#'
+#' # 3. Weighted crosstab with custom labels
+#' xl_crosstab(df, edu, job, w_var = weight,
+#'   row_label = "Education", col_label = "Employed")
 #' @export
 xl_crosstab <- function(data,
                         row_var,

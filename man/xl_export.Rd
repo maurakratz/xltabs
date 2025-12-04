@@ -4,7 +4,7 @@
 \alias{xl_export}
 \title{Export Data Frames to Excel}
 \usage{
-xl_export(data, filename, sheet_name = "Table")
+xl_export(data, filename, sheet_name = "Table", title = NULL, footer = NULL)
 }
 \arguments{
 \item{data}{The data frame produced by \code{xl_crosstab} or \code{xl_freq}.}
@@ -12,9 +12,26 @@ xl_export(data, filename, sheet_name = "Table")
 \item{filename}{String. Path to the output file (.xlsx).}
 
 \item{sheet_name}{String. Name of the Excel sheet. Default "Table".}
+
+\item{title}{Optional String. Text to appear in cell A1 above the table (bold).}
+
+\item{footer}{Optional String. Text to appear below the table (italic, gray).}
 }
 \description{
 Writes the data frame (cross-tabulation or frequency table) to an Excel file
-with text wrapping and top alignment enabled. This ensures that the
-stacked cell content (Counts and Percentages) is displayed correctly.
+with text wrapping and top alignment enabled.
+Allows adding a title above and a footer (source/note) below the table.
+}
+\examples{
+\dontrun{
+# 1. Prepare data
+df <- data.frame(x = c("A", "B"), y = c("Y", "N"))
+my_table <- xl_crosstab(df, x, y)
+
+# 2. Export to a file (e.g. "report.xlsx")
+xl_export(my_table, "report.xlsx", title = "My Table")
+
+# Cleanup (delete file for this example)
+# file.remove("report.xlsx")
+}
 }

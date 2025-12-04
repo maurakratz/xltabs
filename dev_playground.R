@@ -1,4 +1,7 @@
 # --- dev_playground.R ---
+
+
+# xl_crosstab --------------------------------------------------
 devtools::load_all()
 library(dplyr)
 
@@ -40,6 +43,7 @@ print(res_3way)
 # ERWARTUNG: Spalten heißen "Geographische Region" und "Höchster Bildungsabschluss"
 
 
+# xl_freq --------------------------------------------------------
 
 # Test A: Automatische Erkennung
 # (edu hat immer noch das Attribut "Highest Education" aus deinem vorherigen Test)
@@ -47,3 +51,20 @@ xl_freq(test_df, edu)
 
 # Test B: Manuell
 xl_freq(test_df, region, label = "Region (Manuell)")
+
+
+# xl_export ------------------------------------------------------
+# Testdaten vorbereiten (falls weg)
+test_df <- tibble(
+  edu = sample(c("Low", "High"), 100, replace = TRUE),
+  job = sample(c("Yes", "No"), 100, replace = TRUE)
+)
+my_table <- xl_crosstab(test_df, edu, job)
+
+# Der Export mit Titel und Branding
+xl_export(
+  my_table,
+  filename = "report_test.xlsx",
+  title = "Table 1: Education by Job Status",
+  footer = "Source: Artificial Data 2025 | Created with xltabs package"
+)

@@ -44,3 +44,16 @@ formatted as a single string per cell for easy export.
 Includes support for weights, missing values, and a total row.
 Automatically detects variable labels (e.g. from haven).
 }
+\examples{
+# 1. Create dummy data
+df <- data.frame(
+  region = c("North", "South", "North", "North", "South", NA),
+  weight = c(1, 1, 0.5, 1, 1.5, 1)
+)
+
+# 2. Basic frequency
+xl_freq(df, region)
+
+# 3. With weights and explicit missing category
+xl_freq(df, region, w_var = weight, show_na = TRUE, label = "Region")
+}
