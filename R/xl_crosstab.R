@@ -55,7 +55,6 @@ xl_crosstab <- function(data,
                         col_var,
                         strat_var = NULL,
                         w_var = NULL,
-                        # NEU: Label Argumente
                         row_label = NULL,
                         col_label = NULL,
                         strat_label = NULL,
@@ -88,15 +87,13 @@ xl_crosstab <- function(data,
   s_sym <- enquo(strat_var)
   w_sym <- enquo(w_var)
 
-  # --- LABEL LOGIK: Den richtigen Namen finden ---
+  # --- LABEL LOGIK ---
   get_var_label <- function(dataset, quo_col, manual_lab) {
     if (!is.null(manual_lab)) return(manual_lab)
-
     col_name <- rlang::as_name(quo_col)
     lbl <- attr(dataset[[col_name]], "label")
-
     if (!is.null(lbl)) return(lbl)
-    return(col_name) # Fallback
+    return(col_name)
   }
 
   final_row_name <- get_var_label(data, r_sym, row_label)
@@ -182,14 +179,26 @@ xl_crosstab <- function(data,
 
   df_all <- bind_rows(list_parts)
 
-  # --- C. Calculate Percentages ---
+  # --- C. Calculate Percentages (KORRIGIERT für rlang) ---
+
+  # Wir definieren sichere Listen für !!! (Splice Operator)
+  qs_strat <- if (!quo_is_null(s_sym)) quos(!!s_sym) else quos()
+  qs_row   <- quos(!!r_sym)
+  qs_col   <- quos(!!c_sym)
+
   df_calc <- df_all %>%
-    group_by(!!!(if (!quo_is_null(s_sym)) s_sym else NULL)) %>%
+    # 1. Total Pct Basis: Gruppierung nur nach Stratum
+    group_by(!!!qs_strat) %>%
     mutate(stratum_n = sum(n[as_factor(!!r_sym) != "Total" & as_factor(!!c_sym) != "Total"])) %>%
-    group_by(!!!(if (!quo_is_null(s_sym)) c(s_sym, r_sym) else r_sym)) %>%
+
+    # 2. Row Pct Basis: Gruppierung Stratum + Row
+    group_by(!!!c(qs_strat, qs_row)) %>%
     mutate(row_denom = sum(n[as_factor(!!c_sym) != "Total"])) %>%
-    group_by(!!!(if (!quo_is_null(s_sym)) c(s_sym, c_sym) else c_sym)) %>%
+
+    # 3. Col Pct Basis: Gruppierung Stratum + Col
+    group_by(!!!c(qs_strat, qs_col)) %>%
     mutate(col_denom = sum(n[as_factor(!!r_sym) != "Total"])) %>%
+
     ungroup() %>%
     mutate(
       pct_row = n / row_denom,
@@ -255,8 +264,7 @@ xl_crosstab <- function(data,
       values_fill = "-"
     )
 
-  # --- F. Final Renaming (Variable Labels) ---
-
+  # --- F. Final Renaming ---
   if (!quo_is_null(s_sym)) {
     df_pivoted <- df_pivoted %>%
       rename(!!final_strat_name := !!s_sym)
