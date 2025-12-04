@@ -15,6 +15,7 @@
 #' @param col_var The variable to use for columns (unquoted).
 #' @param strat_var Optional. Variable to stratify by (3-way table) (unquoted). Default is NULL.
 #' @param w_var Optional. Variable for weights (unquoted). Default is NULL.
+#' @param counts_col Optional. Variable containing pre-calculated counts (unquoted). Use this if your data is already aggregated.
 #' @param row_label Optional String. Manually set the display name for the row variable.
 #' @param col_label Optional String. Manually set the display name for the column variable.
 #' @param strat_label Optional String. Manually set the display name for the stratification variable.
@@ -35,26 +36,14 @@
 #' @importFrom scales percent
 #' @importFrom openxlsx createWorkbook addWorksheet writeData createStyle addStyle setColWidths saveWorkbook
 #' @import rlang
-#' @examples
-#' # 1. Create dummy data
-#' df <- data.frame(
-#'   edu = c("High", "Low", "High", "Low", "High"),
-#'   job = c("Yes", "No", "Yes", "Yes", "No"),
-#'   weight = c(1, 1.2, 0.8, 1, 1)
-#' )
-#'
-#' # 2. Simple crosstab
-#' xl_crosstab(df, edu, job)
-#'
-#' # 3. Weighted crosstab with custom labels
-#' xl_crosstab(df, edu, job, w_var = weight,
-#'   row_label = "Education", col_label = "Employed")
 #' @export
 xl_crosstab <- function(data,
                         row_var,
                         col_var,
                         strat_var = NULL,
                         w_var = NULL,
+                        # NEU: Pre-aggregated Counts
+                        counts_col = NULL,
                         row_label = NULL,
                         col_label = NULL,
                         strat_label = NULL,
@@ -86,6 +75,7 @@ xl_crosstab <- function(data,
   c_sym <- enquo(col_var)
   s_sym <- enquo(strat_var)
   w_sym <- enquo(w_var)
+  cnt_sym <- enquo(counts_col) # NEU
 
   # --- LABEL LOGIK ---
   get_var_label <- function(dataset, quo_col, manual_lab) {
@@ -140,12 +130,22 @@ xl_crosstab <- function(data,
     df_clean <- df_clean %>% mutate(!!s_sym := as.character(!!s_sym))
   }
 
-  # Helper for weighted counts
+  # --- NEU: Helper Logic ---
+  # Priorität:
+  # 1. Wenn counts_col da ist -> Nimm das als 'wt'
+  # 2. Wenn w_var da ist -> Nimm das als 'wt'
+  # 3. Sonst -> Einfaches count()
+
   calc_counts <- function(d, groups) {
-    if (quo_is_null(w_sym)) {
-      d %>% count(!!!groups, name = "n")
-    } else {
+    if (!quo_is_null(cnt_sym)) {
+      # Fall: Pre-aggregated
+      d %>% count(!!!groups, wt = !!cnt_sym, name = "n")
+    } else if (!quo_is_null(w_sym)) {
+      # Fall: Weighted Raw Data
       d %>% count(!!!groups, wt = !!w_sym, name = "n")
+    } else {
+      # Fall: Raw Data
+      d %>% count(!!!groups, name = "n")
     }
   }
 
@@ -179,26 +179,18 @@ xl_crosstab <- function(data,
 
   df_all <- bind_rows(list_parts)
 
-  # --- C. Calculate Percentages (KORRIGIERT für rlang) ---
-
-  # Wir definieren sichere Listen für !!! (Splice Operator)
+  # --- C. Calculate Percentages ---
   qs_strat <- if (!quo_is_null(s_sym)) quos(!!s_sym) else quos()
   qs_row   <- quos(!!r_sym)
   qs_col   <- quos(!!c_sym)
 
   df_calc <- df_all %>%
-    # 1. Total Pct Basis: Gruppierung nur nach Stratum
     group_by(!!!qs_strat) %>%
     mutate(stratum_n = sum(n[as_factor(!!r_sym) != "Total" & as_factor(!!c_sym) != "Total"])) %>%
-
-    # 2. Row Pct Basis: Gruppierung Stratum + Row
     group_by(!!!c(qs_strat, qs_row)) %>%
     mutate(row_denom = sum(n[as_factor(!!c_sym) != "Total"])) %>%
-
-    # 3. Col Pct Basis: Gruppierung Stratum + Col
     group_by(!!!c(qs_strat, qs_col)) %>%
     mutate(col_denom = sum(n[as_factor(!!r_sym) != "Total"])) %>%
-
     ungroup() %>%
     mutate(
       pct_row = n / row_denom,
@@ -256,13 +248,26 @@ xl_crosstab <- function(data,
     df_sorted <- df_sorted %>% arrange(!!r_sym, !!c_sym)
   }
 
+  # FIX: Spalten-Reihenfolge vorab definieren
+  # Wir sammeln erst die Namen der "linken" Spalten (Stratum und Row)
+  cols_left <- character()
+
+  # Nur wenn Stratum existiert, fügen wir den Namen hinzu
+  if (!quo_is_null(s_sym)) {
+    cols_left <- c(cols_left, rlang::as_name(s_sym))
+  }
+  # Row existiert immer
+  cols_left <- c(cols_left, rlang::as_name(r_sym))
+
   df_pivoted <- df_sorted %>%
     select(!!s_sym, !!r_sym, !!c_sym, cell_content) %>%
     pivot_wider(
       names_from = !!c_sym,
       values_from = cell_content,
       values_fill = "-"
-    )
+    ) %>%
+    # HIER ist der Fix: Wir nutzen den vorbereiteten Vektor 'cols_left'
+    select(any_of(cols_left), any_of(final_levels))
 
   # --- F. Final Renaming ---
   if (!quo_is_null(s_sym)) {

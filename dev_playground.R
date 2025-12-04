@@ -68,3 +68,24 @@ xl_export(
   title = "Table 1: Education by Job Status",
   footer = "Source: Artificial Data 2025 | Created with xltabs package"
 )
+
+
+
+# pre aggregated data ---------------------------
+
+# Wir bauen uns mal "fertige" Daten
+agg_data <- tibble(
+  edu = c("High", "Low"),
+  job = c("Yes", "No"),
+  anzahl = c(500, 200) # Das sind schon gezählte Werte!
+)
+
+# agg_data %>% View()
+
+# Test 1: Cross-Tab mit fertigen Counts
+# Erwartung: 500 und 200 sollten angezeigt werden (nicht 1 und 1)
+xl_crosstab(agg_data, edu, job, counts_col = anzahl)
+
+# Test 2: Frequency mit fertigen Counts
+xl_freq(agg_data, edu, counts_col = anzahl)
+# Erwartung: High = 500, Low = 200, Total = 700

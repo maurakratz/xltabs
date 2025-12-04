@@ -8,6 +8,7 @@ xl_freq(
   data,
   var,
   w_var = NULL,
+  counts_col = NULL,
   label = NULL,
   show_n = TRUE,
   show_pct = TRUE,
@@ -22,6 +23,8 @@ xl_freq(
 \item{var}{The variable to analyze (unquoted).}
 
 \item{w_var}{Optional. Variable for weights (unquoted). Default is NULL.}
+
+\item{counts_col}{Optional. Variable containing pre-calculated counts (unquoted).}
 
 \item{label}{Optional String. Manually set the display name for the variable.}
 
@@ -43,17 +46,4 @@ Generates a data frame representing a frequency table with counts and percentage
 formatted as a single string per cell for easy export.
 Includes support for weights, missing values, and a total row.
 Automatically detects variable labels (e.g. from haven).
-}
-\examples{
-# 1. Create dummy data
-df <- data.frame(
-  region = c("North", "South", "North", "North", "South", NA),
-  weight = c(1, 1, 0.5, 1, 1.5, 1)
-)
-
-# 2. Basic frequency
-xl_freq(df, region)
-
-# 3. With weights and explicit missing category
-xl_freq(df, region, w_var = weight, show_na = TRUE, label = "Region")
 }

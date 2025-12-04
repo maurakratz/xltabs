@@ -10,6 +10,7 @@ xl_crosstab(
   col_var,
   strat_var = NULL,
   w_var = NULL,
+  counts_col = NULL,
   row_label = NULL,
   col_label = NULL,
   strat_label = NULL,
@@ -33,6 +34,8 @@ xl_crosstab(
 \item{strat_var}{Optional. Variable to stratify by (3-way table) (unquoted). Default is NULL.}
 
 \item{w_var}{Optional. Variable for weights (unquoted). Default is NULL.}
+
+\item{counts_col}{Optional. Variable containing pre-calculated counts (unquoted). Use this if your data is already aggregated.}
 
 \item{row_label}{Optional String. Manually set the display name for the row variable.}
 
@@ -69,19 +72,4 @@ This function mimics the visual layout of Stata tables. It handles 2-way and
 customisable output. You can toggle row/column totals, as well as the
 visibility of counts, row percentages, column percentages, and total percentages.
 It automatically detects variable labels (e.g. from haven/sjlabelled) if present.
-}
-\examples{
-# 1. Create dummy data
-df <- data.frame(
-  edu = c("High", "Low", "High", "Low", "High"),
-  job = c("Yes", "No", "Yes", "Yes", "No"),
-  weight = c(1, 1.2, 0.8, 1, 1)
-)
-
-# 2. Simple crosstab
-xl_crosstab(df, edu, job)
-
-# 3. Weighted crosstab with custom labels
-xl_crosstab(df, edu, job, w_var = weight,
-  row_label = "Education", col_label = "Employed")
 }

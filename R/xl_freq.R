@@ -8,6 +8,7 @@
 #' @param data A data frame.
 #' @param var The variable to analyze (unquoted).
 #' @param w_var Optional. Variable for weights (unquoted). Default is NULL.
+#' @param counts_col Optional. Variable containing pre-calculated counts (unquoted).
 #' @param label Optional String. Manually set the display name for the variable.
 #' @param show_n Logical. Show counts? Default TRUE.
 #' @param show_pct Logical. Show percentages? Default TRUE.
@@ -21,23 +22,12 @@
 #' @importFrom forcats as_factor fct_na_value_to_level
 #' @importFrom scales percent
 #' @import rlang
-#' @examples
-#' # 1. Create dummy data
-#' df <- data.frame(
-#'   region = c("North", "South", "North", "North", "South", NA),
-#'   weight = c(1, 1, 0.5, 1, 1.5, 1)
-#' )
-#'
-#' # 2. Basic frequency
-#' xl_freq(df, region)
-#'
-#' # 3. With weights and explicit missing category
-#' xl_freq(df, region, w_var = weight, show_na = TRUE, label = "Region")
 #' @export
 xl_freq <- function(data,
                     var,
                     w_var = NULL,
-                    # NEU: Label Argument
+                    # NEU: Counts Col
+                    counts_col = NULL,
                     label = NULL,
                     show_n = TRUE,
                     show_pct = TRUE,
@@ -56,12 +46,12 @@ xl_freq <- function(data,
   # --- Variablen einfangen ---
   v_sym <- enquo(var)
   w_sym <- enquo(w_var)
+  cnt_sym <- enquo(counts_col) # NEU
 
   # --- LABEL LOGIK ---
   final_name <- if (!is.null(label)) {
     label
   } else {
-    # Versuche Attribut zu finden
     col_name <- rlang::as_name(v_sym)
     lbl <- attr(data[[col_name]], "label")
     if (!is.null(lbl)) lbl else col_name
@@ -83,12 +73,14 @@ xl_freq <- function(data,
   df_clean <- df_clean %>%
     mutate(!!v_sym := as.character(!!v_sym))
 
-  # Helper for counts
+  # --- Helper Logic: NEU ---
   calc_counts <- function(d, groups) {
-    if (quo_is_null(w_sym)) {
-      d %>% count(!!!groups, name = "n")
-    } else {
+    if (!quo_is_null(cnt_sym)) {
+      d %>% count(!!!groups, wt = !!cnt_sym, name = "n")
+    } else if (!quo_is_null(w_sym)) {
       d %>% count(!!!groups, wt = !!w_sym, name = "n")
+    } else {
+      d %>% count(!!!groups, name = "n")
     }
   }
 
@@ -145,7 +137,6 @@ xl_freq <- function(data,
     select(!!v_sym, cell_content)
 
   # --- E. Final Renaming ---
-  # Hier benennen wir die Variable um (z.B. "edu" -> "Highest Education")
   df_sorted <- df_sorted %>%
     rename(!!final_name := !!v_sym)
 

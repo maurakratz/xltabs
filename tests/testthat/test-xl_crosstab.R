@@ -35,3 +35,25 @@ test_that("xl_crosstab validation works", {
   # Wir erwarten einen Fehler, wenn wir Quatsch eingeben
   expect_error(xl_crosstab(df, a, b, show_n = "Falsch"))
 })
+
+test_that("xl_crosstab handles pre-aggregated data (counts_col)", {
+  df_agg <- data.frame(
+    a = c("A", "B"),
+    b = c("Y", "N"),
+    n_count = c(10, 20)
+  )
+
+  res <- xl_crosstab(df_agg, a, b, counts_col = n_count)
+
+  # --- ROBUSTER CHECK ---
+  # 1. Wir filtern die Zeile, in der die erste Variable "Total" ist
+  # (Wir nutzen [[1]], um die erste Spalte sicher zu greifen)
+  total_row <- res[res[[1]] == "Total", ]
+
+  # 2. Wir greifen gezielt auf die SPALTE namens "Total" zu
+  # (Statt ncol(res))
+  total_val_str <- total_row$Total
+
+  # Prüfung
+  expect_true(grepl("30", total_val_str))
+})
