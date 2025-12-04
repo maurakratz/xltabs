@@ -30,7 +30,7 @@
 #'
 #' @return A data frame in wide format, ready for export to Excel.
 #'
-#' @importFrom dplyr mutate filter group_by ungroup count bind_rows arrange select pull if_else rename
+#' @importFrom dplyr mutate filter group_by ungroup count bind_rows arrange select pull if_else rename any_of
 #' @importFrom tidyr pivot_wider
 #' @importFrom forcats as_factor fct_relevel fct_na_value_to_level
 #' @importFrom scales percent

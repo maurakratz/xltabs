@@ -1,0 +1,65 @@
+---
+output: github_document
+---
+
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# xltabs
+
+The goal of xltabs is to generate professional cross-tabulations and frequency tables and export them to Excel with proper formatting. The output mimics the visual layout of Stata tables by combining counts and percentages into a single cell using line breaks. The display of counts, row and column totals, missing values, weights, and percentages is customisable. Tables can be generated from raw or from pre-aggregated data (e.g., in case of complex survey design).
+
+
+## Installation
+
+You can install the development version of xltabs from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("maurakratz/xltabs")
+```
+
+## Example
+
+Here is a basic example of how you can create a Stata-styled crosstable for export to Excel with xltabs:
+
+```{r crosstable, message=FALSE, warning=FALSE}
+library(xltabs)
+library(dplyr)
+
+# 1. Create dummy data
+df <- tibble(
+  edu = c("High", "Low", "High", "Low", "High"),
+  job = c("Yes", "No", "Yes", "Yes", "No"),
+  weight = c(1, 1.2, 0.8, 1, 1)
+)
+
+# 2. Create the crosstab data frame
+my_tab <- xl_crosstab(df, edu, job, w_var = weight, 
+                      row_label = "Education", col_label = "Employed")
+
+# 3. Print it (Stata style!)
+print(my_tab)
+```
+
+
+To export this table to an Excel sheet with title and footer: 
+```{r export}
+# 1 Export to Excel
+xl_export(my_tab, "report.xlsx", 
+          title = "Table 1: Education by Employment",
+          footer = "Source: Toy Data")
+
+# 2 Open the report.xlsx file to check out the layout (Don't forget to enable text wrapping in Excel for the line breaks!)
+
+# 3 You might want to delete the file created by this example so it doesn't clutter your folder
+if (file.exists("report.xlsx")) file.remove("report.xlsx")
+```
+
