@@ -31,29 +31,28 @@ xl_crosstab(
 
 \item{w_var}{Variable for weights (unquoted). Default is NULL.}
 
-\item{add_total_row}{Logical. Add a "Total" row at the bottom? Default TRUE.}
+\item{add_total_row}{Logical. Add a "Total" row at the bottom? Default is TRUE.}
 
-\item{add_total_col}{Logical. Add a "Total" column at the right? Default TRUE.}
+\item{add_total_col}{Logical. Add a "Total" column at the right? Default is TRUE.}
 
-\item{show_n}{Logical. Show counts? Default TRUE.}
+\item{show_n}{Logical. Show counts? Default is TRUE.}
 
-\item{show_row_pct}{Logical. Show row percentages? Default TRUE.}
+\item{show_row_pct}{Logical. Show row percentages? Default is TRUE.}
 
 \item{show_col_pct}{Logical. Show column percentages? Default TRUE.}
 
-\item{show_tot_pct}{Logical. Show total percentages? Default TRUE.}
+\item{show_tot_pct}{Logical. Show total percentages? Default is TRUE.}
 
-\item{show_na}{Logical. If TRUE, missing values in row/col variables are shown as explicit category. Default FALSE.}
+\item{show_na}{Logical. Show missing values in row/col variables as explicit category? Default is FALSE.}
 
-\item{na_label}{String. Label for missing values. Default "Missing".}
+\item{na_label}{String. Label for missing values. Default is "Missing".}
 }
 \value{
 A data frame in wide format, ready for Excel export.
 }
 \description{
-Generates a data frame representing a cross-tabulation with counts and percentages (row, col, total),
-formatted as a single string per cell for easy export into Excel workbooks.
-Handles 2-way and 3-way tables, weights, and missing values.
-Allows toggling of row/column totals, as well as the visibility of counts,
-row percentages, column percentages, and total percentages.
+Generates a data frame representing a cross-tabulation, with cell content stacked into a single string for easy export to Excel workbooks.
+}
+\details{
+This function mimics the visual layout of Stata tables. It handles 2-way and 3-way tables, supports weights and missing values, and allows fully customisable output. You can toggle row/column totals, as well as the visibility of counts, row percentages, column percentages, and total percentages.
 }

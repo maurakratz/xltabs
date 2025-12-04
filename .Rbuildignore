@@ -1,3 +1,5 @@
 ^xltabs\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
+^dev_playground\.R$
+^*\.xlsx$

@@ -2,7 +2,7 @@
 % Please edit documentation in R/xl_freq.R
 \name{xl_freq}
 \alias{xl_freq}
-\title{Create Stata-style Frequency Tables Export to Excel}
+\title{Create Stata-style Frequency Tables for Excel Export}
 \usage{
 xl_freq(
   data,
