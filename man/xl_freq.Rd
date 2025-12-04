@@ -8,6 +8,7 @@ xl_freq(
   data,
   var,
   w_var = NULL,
+  label = NULL,
   show_n = TRUE,
   show_pct = TRUE,
   show_na = FALSE,
@@ -21,6 +22,8 @@ xl_freq(
 \item{var}{The variable to analyze (unquoted).}
 
 \item{w_var}{Optional. Variable for weights (unquoted). Default is NULL.}
+
+\item{label}{Optional String. Manually set the display name for the variable.}
 
 \item{show_n}{Logical. Show counts? Default TRUE.}
 
@@ -39,4 +42,5 @@ A data frame with two columns: The category and the formatted stats.
 Generates a data frame representing a frequency table with counts and percentages,
 formatted as a single string per cell for easy export.
 Includes support for weights, missing values, and a total row.
+Automatically detects variable labels (e.g. from haven).
 }

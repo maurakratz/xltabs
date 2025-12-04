@@ -1,25 +1,35 @@
 #' Create Stata-style Cross-Tabulations for Export to Excel
 #'
-#' Generates a data frame representing a cross-tabulation, with cell content stacked into a single string for easy export to Excel workbooks.
+#' Generates a data frame representing a cross-tabulation, with cell content
+#' stacked into a single string for easy export to Excel workbooks.
 #'
-#' @details This function mimics the visual layout of Stata tables. It handles 2-way and 3-way tables, supports weights and missing values, and allows fully customisable output. You can toggle row/column totals, as well as the visibility of counts, row percentages, column percentages, and total percentages.
+#' @details
+#' This function mimics the visual layout of Stata tables. It handles 2-way and
+#' 3-way tables, supports weights and missing values, and allows fully
+#' customisable output. You can toggle row/column totals, as well as the
+#' visibility of counts, row percentages, column percentages, and total percentages.
+#' It automatically detects variable labels (e.g. from haven/sjlabelled) if present.
 #'
 #' @param data A data frame.
 #' @param row_var The variable to use for rows (unquoted).
 #' @param col_var The variable to use for columns (unquoted).
-#' @param strat_var Variable to stratify by in a 3-way table (unquoted). Default is NULL.
-#' @param w_var Variable for weights (unquoted). Default is NULL.
-#' @param add_total_row Logical. Add a "Total" row at the bottom? Default is TRUE.
-#' @param add_total_col Logical. Add a "Total" column at the right? Default is TRUE.
-#' @param show_n Logical. Show counts? Default is TRUE.
-#' @param show_row_pct Logical. Show row percentages? Default is TRUE.
+#' @param strat_var Optional. Variable to stratify by (3-way table) (unquoted). Default is NULL.
+#' @param w_var Optional. Variable for weights (unquoted). Default is NULL.
+#' @param row_label Optional String. Manually set the display name for the row variable.
+#' @param col_label Optional String. Manually set the display name for the column variable.
+#' @param strat_label Optional String. Manually set the display name for the stratification variable.
+#' @param add_total_row Logical. Add a "Total" row at the bottom? Default TRUE.
+#' @param add_total_col Logical. Add a "Total" column at the right? Default TRUE.
+#' @param show_n Logical. Show counts? Default TRUE.
+#' @param show_row_pct Logical. Show row percentages? Default TRUE.
 #' @param show_col_pct Logical. Show column percentages? Default TRUE.
-#' @param show_tot_pct Logical. Show total percentages? Default is TRUE.
-#' @param show_na Logical. Show missing values in row/col variables as explicit category? Default is FALSE.
-#' @param na_label String. Label for missing values. Default is "Missing".
+#' @param show_tot_pct Logical. Show total percentages? Default TRUE.
+#' @param show_na Logical. If TRUE, missing values in row/col variables are shown as an explicit category. Default FALSE.
+#' @param na_label String. Label for missing values. Default "Missing".
 #'
-#' @return A data frame in wide format, ready for Excel export.
-#' @importFrom dplyr mutate filter group_by ungroup count bind_rows arrange select pull if_else
+#' @return A data frame in wide format, ready for export to Excel.
+#'
+#' @importFrom dplyr mutate filter group_by ungroup count bind_rows arrange select pull if_else rename
 #' @importFrom tidyr pivot_wider
 #' @importFrom forcats as_factor fct_relevel fct_na_value_to_level
 #' @importFrom scales percent
@@ -31,6 +41,10 @@ xl_crosstab <- function(data,
                         col_var,
                         strat_var = NULL,
                         w_var = NULL,
+                        # NEU: Label Argumente
+                        row_label = NULL,
+                        col_label = NULL,
+                        strat_label = NULL,
                         add_total_row = TRUE,
                         add_total_col = TRUE,
                         show_n = TRUE,
@@ -50,13 +64,31 @@ xl_crosstab <- function(data,
   check_bool(show_na)
   check_string(na_label)
 
+  if (!is.null(row_label)) check_string(row_label)
+  if (!is.null(col_label)) check_string(col_label)
+  if (!is.null(strat_label)) check_string(strat_label)
+
   # --- Variablen einfangen ---
   r_sym <- enquo(row_var)
   c_sym <- enquo(col_var)
   s_sym <- enquo(strat_var)
   w_sym <- enquo(w_var)
 
-  # 1. Prepare Data
+  # --- LABEL LOGIK: Den richtigen Namen finden ---
+  get_var_label <- function(dataset, quo_col, manual_lab) {
+    if (!is.null(manual_lab)) return(manual_lab)
+
+    col_name <- rlang::as_name(quo_col)
+    lbl <- attr(dataset[[col_name]], "label")
+
+    if (!is.null(lbl)) return(lbl)
+    return(col_name) # Fallback
+  }
+
+  final_row_name <- get_var_label(data, r_sym, row_label)
+  final_strat_name <- if (!quo_is_null(s_sym)) get_var_label(data, s_sym, strat_label) else NULL
+
+  # --- 2. Prepare Data ---
   df_prep <- data %>%
     mutate(
       !!r_sym := as_factor(!!r_sym),
@@ -86,7 +118,7 @@ xl_crosstab <- function(data,
     }
   }
 
-  # Convert to character for "Total" insertion
+  # Convert to character
   df_clean <- df_clean %>%
     mutate(
       !!r_sym := as.character(!!r_sym),
@@ -151,7 +183,7 @@ xl_crosstab <- function(data,
       pct_tot = n / stratum_n
     )
 
-  # --- D. Formatting (String Build) ---
+  # --- D. Formatting ---
   df_final <- df_calc %>%
     mutate(
       is_t_row = as.character(!!r_sym) == "Total",
@@ -176,7 +208,7 @@ xl_crosstab <- function(data,
     ) %>%
     mutate(cell_content = gsub("\n$", "", cell_content))
 
-  # --- E. Sorting & Pivot (Manual Set Logic) ---
+  # --- E. Sorting & Pivot ---
   col_vals <- df_final %>% pull(!!c_sym) %>% unique() %>% as.character()
 
   has_total <- "Total" %in% col_vals
@@ -208,6 +240,16 @@ xl_crosstab <- function(data,
       values_from = cell_content,
       values_fill = "-"
     )
+
+  # --- F. Final Renaming (Variable Labels) ---
+
+  if (!quo_is_null(s_sym)) {
+    df_pivoted <- df_pivoted %>%
+      rename(!!final_strat_name := !!s_sym)
+  }
+
+  df_pivoted <- df_pivoted %>%
+    rename(!!final_row_name := !!r_sym)
 
   return(df_pivoted)
 }

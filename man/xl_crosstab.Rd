@@ -2,7 +2,7 @@
 % Please edit documentation in R/xl_crosstab.R
 \name{xl_crosstab}
 \alias{xl_crosstab}
-\title{Create Stata-style Cross Tables for Export to Excel}
+\title{Create Stata-style Cross-Tabulations for Export to Excel}
 \usage{
 xl_crosstab(
   data,
@@ -10,6 +10,9 @@ xl_crosstab(
   col_var,
   strat_var = NULL,
   w_var = NULL,
+  row_label = NULL,
+  col_label = NULL,
+  strat_label = NULL,
   add_total_row = TRUE,
   add_total_col = TRUE,
   show_n = TRUE,
@@ -27,32 +30,43 @@ xl_crosstab(
 
 \item{col_var}{The variable to use for columns (unquoted).}
 
-\item{strat_var}{Variable to stratify by in a 3-way table (unquoted). Default is NULL.}
+\item{strat_var}{Optional. Variable to stratify by (3-way table) (unquoted). Default is NULL.}
 
-\item{w_var}{Variable for weights (unquoted). Default is NULL.}
+\item{w_var}{Optional. Variable for weights (unquoted). Default is NULL.}
 
-\item{add_total_row}{Logical. Add a "Total" row at the bottom? Default is TRUE.}
+\item{row_label}{Optional String. Manually set the display name for the row variable.}
 
-\item{add_total_col}{Logical. Add a "Total" column at the right? Default is TRUE.}
+\item{col_label}{Optional String. Manually set the display name for the column variable.}
 
-\item{show_n}{Logical. Show counts? Default is TRUE.}
+\item{strat_label}{Optional String. Manually set the display name for the stratification variable.}
 
-\item{show_row_pct}{Logical. Show row percentages? Default is TRUE.}
+\item{add_total_row}{Logical. Add a "Total" row at the bottom? Default TRUE.}
+
+\item{add_total_col}{Logical. Add a "Total" column at the right? Default TRUE.}
+
+\item{show_n}{Logical. Show counts? Default TRUE.}
+
+\item{show_row_pct}{Logical. Show row percentages? Default TRUE.}
 
 \item{show_col_pct}{Logical. Show column percentages? Default TRUE.}
 
-\item{show_tot_pct}{Logical. Show total percentages? Default is TRUE.}
+\item{show_tot_pct}{Logical. Show total percentages? Default TRUE.}
 
-\item{show_na}{Logical. Show missing values in row/col variables as explicit category? Default is FALSE.}
+\item{show_na}{Logical. If TRUE, missing values in row/col variables are shown as an explicit category. Default FALSE.}
 
-\item{na_label}{String. Label for missing values. Default is "Missing".}
+\item{na_label}{String. Label for missing values. Default "Missing".}
 }
 \value{
-A data frame in wide format, ready for Excel export.
+A data frame in wide format, ready for export to Excel.
 }
 \description{
-Generates a data frame representing a cross-tabulation, with cell content stacked into a single string for easy export to Excel workbooks.
+Generates a data frame representing a cross-tabulation, with cell content
+stacked into a single string for easy export to Excel workbooks.
 }
 \details{
-This function mimics the visual layout of Stata tables. It handles 2-way and 3-way tables, supports weights and missing values, and allows fully customisable output. You can toggle row/column totals, as well as the visibility of counts, row percentages, column percentages, and total percentages.
+This function mimics the visual layout of Stata tables. It handles 2-way and
+3-way tables, supports weights and missing values, and allows fully
+customisable output. You can toggle row/column totals, as well as the
+visibility of counts, row percentages, column percentages, and total percentages.
+It automatically detects variable labels (e.g. from haven/sjlabelled) if present.
 }

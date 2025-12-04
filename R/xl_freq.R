@@ -3,10 +3,12 @@
 #' Generates a data frame representing a frequency table with counts and percentages,
 #' formatted as a single string per cell for easy export.
 #' Includes support for weights, missing values, and a total row.
+#' Automatically detects variable labels (e.g. from haven).
 #'
 #' @param data A data frame.
 #' @param var The variable to analyze (unquoted).
 #' @param w_var Optional. Variable for weights (unquoted). Default is NULL.
+#' @param label Optional String. Manually set the display name for the variable.
 #' @param show_n Logical. Show counts? Default TRUE.
 #' @param show_pct Logical. Show percentages? Default TRUE.
 #' @param show_na Logical. If TRUE, missing values are shown as explicit category. Default FALSE.
@@ -15,7 +17,7 @@
 #'
 #' @return A data frame with two columns: The category and the formatted stats.
 #'
-#' @importFrom dplyr mutate filter count bind_rows select pull if_else arrange group_by ungroup summarise
+#' @importFrom dplyr mutate filter count bind_rows select pull if_else arrange group_by ungroup summarise rename
 #' @importFrom forcats as_factor fct_na_value_to_level
 #' @importFrom scales percent
 #' @import rlang
@@ -23,6 +25,8 @@
 xl_freq <- function(data,
                     var,
                     w_var = NULL,
+                    # NEU: Label Argument
+                    label = NULL,
                     show_n = TRUE,
                     show_pct = TRUE,
                     show_na = FALSE,
@@ -35,10 +39,21 @@ xl_freq <- function(data,
   check_bool(show_na)
   check_string(na_label)
   check_bool(add_total)
+  if (!is.null(label)) check_string(label)
 
   # --- Variablen einfangen ---
   v_sym <- enquo(var)
   w_sym <- enquo(w_var)
+
+  # --- LABEL LOGIK ---
+  final_name <- if (!is.null(label)) {
+    label
+  } else {
+    # Versuche Attribut zu finden
+    col_name <- rlang::as_name(v_sym)
+    lbl <- attr(data[[col_name]], "label")
+    if (!is.null(lbl)) lbl else col_name
+  }
 
   # 2. Prepare Data & Handle NA
   df_prep <- data %>%
@@ -78,7 +93,6 @@ xl_freq <- function(data,
   }
 
   # --- B. Percentages ---
-  # Get the total N (from the Total row if exists, or sum of others)
   total_n_val <- if (add_total) {
     df_counts %>% filter(!!v_sym == "Total") %>% pull(n)
   } else {
@@ -91,22 +105,17 @@ xl_freq <- function(data,
       is_total = (!!v_sym == "Total")
     )
 
-  # --- C. Formatting (FIXED: using standard if instead of if_else) ---
+  # --- C. Formatting ---
   df_final <- df_calc %>%
     mutate(
       cell_content = paste0(
-        # 1. N
         if (show_n) paste0(round(n, 0)) else "",
-
-        # 2. Break (nur wenn beides an ist)
         if (show_n && show_pct) "\n" else "",
-
-        # 3. Percent
         if (show_pct) paste0(scales::percent(pct, 0.1)) else ""
       )
     )
 
-  # --- D. Sorting (Robust Logic) ---
+  # --- D. Sorting ---
   vals <- df_final %>% pull(!!v_sym)
   specials <- c()
 
@@ -116,13 +125,17 @@ xl_freq <- function(data,
   normals <- setdiff(vals, specials)
   normals <- sort(normals)
 
-  # Order: Normals -> Missing -> Total
   final_levels <- c(normals, specials)
 
   df_sorted <- df_final %>%
     mutate(!!v_sym := factor(!!v_sym, levels = final_levels)) %>%
     arrange(!!v_sym) %>%
     select(!!v_sym, cell_content)
+
+  # --- E. Final Renaming ---
+  # Hier benennen wir die Variable um (z.B. "edu" -> "Highest Education")
+  df_sorted <- df_sorted %>%
+    rename(!!final_name := !!v_sym)
 
   return(df_sorted)
 }
