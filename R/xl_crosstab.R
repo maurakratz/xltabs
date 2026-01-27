@@ -221,7 +221,10 @@ xl_crosstab <- function(data,
         if_else(use_tot, paste0(scales::percent(pct_tot, 0.1)), "")
       )
     ) %>%
-    mutate(cell_content = gsub("\n$", "", cell_content))
+    mutate(cell_content = gsub("\n$", "", cell_content)) %>%
+    # WICHTIG: Das hier verhindert Duplikate durch "Müll-Spalten"
+    dplyr::select(any_of(c(as_name(s_sym), as_name(r_sym), as_name(c_sym))), cell_content) %>%
+    distinct()
 
   # --- E. Sorting & Pivot ---
   col_vals <- df_final %>% pull(!!c_sym) %>% unique() %>% as.character()
@@ -248,25 +251,22 @@ xl_crosstab <- function(data,
     df_sorted <- df_sorted %>% arrange(!!r_sym, !!c_sym)
   }
 
-  # FIX: Spalten-Reihenfolge vorab definieren
-  # Wir sammeln erst die Namen der "linken" Spalten (Stratum und Row)
   cols_left <- character()
-
-  # Nur wenn Stratum existiert, fügen wir den Namen hinzu
   if (!quo_is_null(s_sym)) {
     cols_left <- c(cols_left, rlang::as_name(s_sym))
   }
-  # Row existiert immer
   cols_left <- c(cols_left, rlang::as_name(r_sym))
 
+  # --- FIX: ROBUSTER PIVOT ---
+  # Wir entfernen values_fill aus pivot_wider und machen es danach manuell
   df_pivoted <- df_sorted %>%
     select(!!s_sym, !!r_sym, !!c_sym, cell_content) %>%
     pivot_wider(
       names_from = !!c_sym,
-      values_from = cell_content,
-      values_fill = "-"
+      values_from = cell_content
     ) %>%
-    # HIER ist der Fix: Wir nutzen den vorbereiteten Vektor 'cols_left'
+    # Hier werden die NAs durch "-" ersetzt - das stürzt nicht ab
+    mutate(across(any_of(final_levels), ~ tidyr::replace_na(., "-"))) %>%
     select(any_of(cols_left), any_of(final_levels))
 
   # --- F. Final Renaming ---
