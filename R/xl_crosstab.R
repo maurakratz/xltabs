@@ -43,7 +43,7 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
                         title = NULL, footer = NULL,
                         show_n = TRUE, show_row_pct = TRUE, show_col_pct = TRUE, show_tot_pct = FALSE,
                         na_label = "(Missing)", decimals = 1) {
-  # --- FIX 1: Gruppierung entfernen (Löst das n=1 Problem) ---
+  # --- STEP 0: CLEAN SLATE ---
   df <- dplyr::ungroup(df)
 
   r_sym <- rlang::enquo(row_var)
@@ -54,8 +54,6 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
 
   # --- 1. FREQUENCY TABLE CHECK ---
   if (rlang::quo_is_null(c_sym)) {
-    # Hinweis: Falls xl_freq nicht exportiert ist, könnte das hier fehlschlagen,
-    # aber für deinen aktuellen Fall (Crosstab) ist das egal.
     return(xl_freq(df, !!r_sym, w_var = !!w_sym,
       row_label = row_label, title = title, footer = footer,
       na_label = na_label, decimals = decimals))
@@ -72,7 +70,7 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
   final_row_name <- get_lab(r_sym, row_label)
   final_strat_name <- if (!rlang::quo_is_null(s_sym)) get_lab(s_sym, strat_label) else "Stratum"
 
-  # --- FIX 2: Robuste Aggregation (summarise statt count) ---
+  # --- HELPER: ROBUST AGGREGATION ---
   calc_counts <- function(d, groups) {
     if (!rlang::quo_is_null(n_sym)) {
       d %>%
@@ -83,7 +81,6 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
         dplyr::group_by(dplyr::across(dplyr::all_of(groups))) %>%
         dplyr::summarise(n = sum(!!w_sym, na.rm = TRUE), .groups = "drop")
     } else {
-      # Das hier erzwingt das Zählen, auch wenn vorher Gruppen da waren
       d %>%
         dplyr::group_by(dplyr::across(dplyr::all_of(groups))) %>%
         dplyr::summarise(n = dplyr::n(), .groups = "drop")
@@ -153,6 +150,10 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
   # --- D. Formatting ---
   fmt <- function(x) format(round(x, decimals), nsmall = decimals)
 
+  # BUGFIX: Dynamische Spaltenauswahl für select() erstellen
+  cols_to_keep <- c(rlang::as_name(r_sym), rlang::as_name(c_sym))
+  if (!rlang::quo_is_null(s_sym)) cols_to_keep <- c(rlang::as_name(s_sym), cols_to_keep)
+
   df_fmt <- df_calc %>%
     dplyr::mutate(
       pct_row = (n / row_denom) * 100,
@@ -176,7 +177,8 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
       )
     ) %>%
     dplyr::mutate(cell_content = gsub("\n$", "", cell_content)) %>%
-    dplyr::select(dplyr::any_of(c(rlang::as_name(s_sym), rlang::as_name(r_sym), rlang::as_name(c_sym))), cell_content) %>%
+    # HIER WAR DER FEHLER: Wir nehmen nur cols_to_keep (die wir oben geprüft haben)
+    dplyr::select(dplyr::any_of(cols_to_keep), cell_content) %>%
     dplyr::distinct()
 
   # --- E. Sorting & Pivot ---
