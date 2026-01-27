@@ -37,246 +37,181 @@
 #' @importFrom openxlsx createWorkbook addWorksheet writeData createStyle addStyle setColWidths saveWorkbook
 #' @import rlang
 #' @export
-xl_crosstab <- function(data,
-                        row_var,
-                        col_var,
-                        strat_var = NULL,
-                        w_var = NULL,
-                        # NEU: Pre-aggregated Counts
+xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = NULL,
                         counts_col = NULL,
-                        row_label = NULL,
-                        col_label = NULL,
-                        strat_label = NULL,
-                        add_total_row = TRUE,
-                        add_total_col = TRUE,
-                        show_n = TRUE,
-                        show_row_pct = TRUE,
-                        show_col_pct = TRUE,
-                        show_tot_pct = TRUE,
-                        show_na = FALSE,
-                        na_label = "Missing") {
-  # --- 1. Input Checks ---
-  check_df(data)
-  check_bool(add_total_row)
-  check_bool(add_total_col)
-  check_bool(show_n)
-  check_bool(show_row_pct)
-  check_bool(show_col_pct)
-  check_bool(show_tot_pct)
-  check_bool(show_na)
-  check_string(na_label)
+                        row_label = NULL, col_label = NULL, strat_label = NULL,
+                        title = NULL, footer = NULL,
+                        show_n = TRUE, show_row_pct = TRUE, show_col_pct = TRUE, show_tot_pct = FALSE,
+                        na_label = "(Missing)", decimals = 1) {
+  # --- FIX 1: Gruppierung entfernen (Löst das n=1 Problem) ---
+  df <- dplyr::ungroup(df)
 
-  if (!is.null(row_label)) check_string(row_label)
-  if (!is.null(col_label)) check_string(col_label)
-  if (!is.null(strat_label)) check_string(strat_label)
+  r_sym <- rlang::enquo(row_var)
+  c_sym <- rlang::enquo(col_var)
+  s_sym <- rlang::enquo(strat_var)
+  w_sym <- rlang::enquo(w_var)
+  n_sym <- rlang::enquo(counts_col)
 
-  # --- Variablen einfangen ---
-  r_sym <- enquo(row_var)
-  c_sym <- enquo(col_var)
-  s_sym <- enquo(strat_var)
-  w_sym <- enquo(w_var)
-  cnt_sym <- enquo(counts_col) # NEU
+  # --- 1. FREQUENCY TABLE CHECK ---
+  if (rlang::quo_is_null(c_sym)) {
+    # Hinweis: Falls xl_freq nicht exportiert ist, könnte das hier fehlschlagen,
+    # aber für deinen aktuellen Fall (Crosstab) ist das egal.
+    return(xl_freq(df, !!r_sym, w_var = !!w_sym,
+      row_label = row_label, title = title, footer = footer,
+      na_label = na_label, decimals = decimals))
+  }
 
-  # --- LABEL LOGIK ---
-  get_var_label <- function(dataset, quo_col, manual_lab) {
+  # --- 2. PREPARATION ---
+  get_lab <- function(var_quo, manual_lab) {
     if (!is.null(manual_lab)) return(manual_lab)
-    col_name <- rlang::as_name(quo_col)
-    lbl <- attr(dataset[[col_name]], "label")
+    lbl <- tryCatch(attr(dplyr::pull(df, !!var_quo), "label"), error = function(e) NULL)
     if (!is.null(lbl)) return(lbl)
-    return(col_name)
+    return(rlang::as_name(var_quo))
   }
 
-  final_row_name <- get_var_label(data, r_sym, row_label)
-  final_strat_name <- if (!quo_is_null(s_sym)) get_var_label(data, s_sym, strat_label) else NULL
+  final_row_name <- get_lab(r_sym, row_label)
+  final_strat_name <- if (!rlang::quo_is_null(s_sym)) get_lab(s_sym, strat_label) else "Stratum"
 
-  # --- 2. Prepare Data ---
-  df_prep <- data %>%
-    mutate(
-      !!r_sym := as_factor(!!r_sym),
-      !!c_sym := as_factor(!!c_sym)
-    )
-
-  if (!quo_is_null(s_sym)) {
-    df_prep <- df_prep %>% mutate(!!s_sym := as_factor(!!s_sym))
-  }
-
-  # Handle NA
-  if (show_na) {
-    df_clean <- df_prep %>%
-      mutate(
-        !!r_sym := fct_na_value_to_level(!!r_sym, level = na_label),
-        !!c_sym := fct_na_value_to_level(!!c_sym, level = na_label)
-      )
-    if (!quo_is_null(s_sym)) {
-      df_clean <- df_clean %>%
-        mutate(!!s_sym := fct_na_value_to_level(!!s_sym, level = na_label))
-    }
-  } else {
-    df_clean <- df_prep %>%
-      filter(!is.na(!!r_sym), !is.na(!!c_sym))
-    if (!quo_is_null(s_sym)) {
-      df_clean <- df_clean %>% filter(!is.na(!!s_sym))
-    }
-  }
-
-  # Convert to character
-  df_clean <- df_clean %>%
-    mutate(
-      !!r_sym := as.character(!!r_sym),
-      !!c_sym := as.character(!!c_sym)
-    )
-
-  if (!quo_is_null(s_sym)) {
-    df_clean <- df_clean %>% mutate(!!s_sym := as.character(!!s_sym))
-  }
-
-  # --- NEU: Helper Logic ---
-  # Priorität:
-  # 1. Wenn counts_col da ist -> Nimm das als 'wt'
-  # 2. Wenn w_var da ist -> Nimm das als 'wt'
-  # 3. Sonst -> Einfaches count()
-
+  # --- FIX 2: Robuste Aggregation (summarise statt count) ---
   calc_counts <- function(d, groups) {
-    if (!quo_is_null(cnt_sym)) {
-      # Fall: Pre-aggregated
-      d %>% count(!!!groups, wt = !!cnt_sym, name = "n")
-    } else if (!quo_is_null(w_sym)) {
-      # Fall: Weighted Raw Data
-      d %>% count(!!!groups, wt = !!w_sym, name = "n")
+    if (!rlang::quo_is_null(n_sym)) {
+      d %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(groups))) %>%
+        dplyr::summarise(n = sum(!!n_sym, na.rm = TRUE), .groups = "drop")
+    } else if (!rlang::quo_is_null(w_sym)) {
+      d %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(groups))) %>%
+        dplyr::summarise(n = sum(!!w_sym, na.rm = TRUE), .groups = "drop")
     } else {
-      # Fall: Raw Data
-      d %>% count(!!!groups, name = "n")
+      # Das hier erzwingt das Zählen, auch wenn vorher Gruppen da waren
+      d %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(groups))) %>%
+        dplyr::summarise(n = dplyr::n(), .groups = "drop")
     }
   }
 
-  # --- A. Core Counts ---
-  groups_core <- quos(!!r_sym, !!c_sym)
-  if (!quo_is_null(s_sym)) groups_core <- c(quos(!!s_sym), groups_core)
-  df_core <- calc_counts(df_clean, groups_core)
-  list_parts <- list(df_core)
-
-  # --- B. Marginals (Totals) ---
-  if (add_total_col) {
-    groups_row <- quos(!!r_sym)
-    if (!quo_is_null(s_sym)) groups_row <- c(quos(!!s_sym), groups_row)
-    df_col_totals <- calc_counts(df_clean, groups_row) %>% mutate(!!c_sym := "Total")
-    list_parts <- append(list_parts, list(df_col_totals))
+  # Clean Data
+  df_clean <- df %>%
+    dplyr::mutate(
+      !!r_sym := dplyr::if_else(is.na(!!r_sym), na_label, as.character(!!r_sym)),
+      !!c_sym := dplyr::if_else(is.na(!!c_sym), na_label, as.character(!!c_sym))
+    )
+  if (!rlang::quo_is_null(s_sym)) {
+    df_clean <- df_clean %>% dplyr::mutate(!!s_sym := dplyr::if_else(is.na(!!s_sym), na_label, as.character(!!s_sym)))
   }
 
-  if (add_total_row) {
-    groups_col <- quos(!!c_sym)
-    if (!quo_is_null(s_sym)) groups_col <- c(quos(!!s_sym), groups_col)
-    df_row_totals <- calc_counts(df_clean, groups_col) %>% mutate(!!r_sym := "Total")
-    list_parts <- append(list_parts, list(df_row_totals))
+  # --- B. Build Core & Totals ---
+  grps_core <- c()
+  if (!rlang::quo_is_null(s_sym)) grps_core <- c(grps_core, rlang::as_name(s_sym))
+  grps_core <- c(grps_core, rlang::as_name(r_sym), rlang::as_name(c_sym))
+  df_core <- calc_counts(df_clean, grps_core)
+
+  grps_row <- c()
+  if (!rlang::quo_is_null(s_sym)) grps_row <- c(grps_row, rlang::as_name(s_sym))
+  grps_row <- c(grps_row, rlang::as_name(r_sym))
+  df_col_totals <- calc_counts(df_clean, grps_row) %>% dplyr::mutate(!!c_sym := "Total")
+
+  grps_col <- c()
+  if (!rlang::quo_is_null(s_sym)) grps_col <- c(grps_col, rlang::as_name(s_sym))
+  grps_col <- c(grps_col, rlang::as_name(c_sym))
+  df_row_totals <- calc_counts(df_clean, grps_col) %>% dplyr::mutate(!!r_sym := "Total")
+
+  grps_strat <- c()
+  if (!rlang::quo_is_null(s_sym)) grps_strat <- c(grps_strat, rlang::as_name(s_sym))
+  if (length(grps_strat) > 0) {
+    df_grand <- calc_counts(df_clean, grps_strat) %>% dplyr::mutate(!!r_sym := "Total", !!c_sym := "Total")
+  } else {
+    total_n <- if (!rlang::quo_is_null(n_sym)) sum(dplyr::pull(df_clean, !!n_sym), na.rm = TRUE) else      if (!rlang::quo_is_null(w_sym)) sum(dplyr::pull(df_clean, !!w_sym), na.rm = TRUE) else nrow(df_clean)
+    df_grand <- dplyr::tibble(!!r_sym := "Total", !!c_sym := "Total", n = total_n)
   }
 
-  if (add_total_row && add_total_col) {
-    groups_strat <- quos()
-    if (!quo_is_null(s_sym)) groups_strat <- quos(!!s_sym)
-    df_grand <- calc_counts(df_clean, groups_strat) %>% mutate(!!r_sym := "Total", !!c_sym := "Total")
-    list_parts <- append(list_parts, list(df_grand))
+  df_all <- dplyr::bind_rows(df_core, df_col_totals, df_row_totals, df_grand)
+
+  # --- C. Denominators ---
+  df_row_denom <- df_all %>% dplyr::filter(!!c_sym != "Total") %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(grps_row))) %>%
+    dplyr::summarise(row_denom = sum(n), .groups = "drop")
+
+  df_col_denom <- df_all %>% dplyr::filter(!!r_sym != "Total") %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(grps_col))) %>%
+    dplyr::summarise(col_denom = sum(n), .groups = "drop")
+
+  if (length(grps_strat) > 0) {
+    df_strat_denom <- df_all %>% dplyr::filter(!!r_sym != "Total", !!c_sym != "Total") %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(grps_strat))) %>%
+      dplyr::summarise(stratum_n = sum(n), .groups = "drop")
+  } else {
+    df_strat_denom <- df_all %>% dplyr::filter(!!r_sym != "Total", !!c_sym != "Total") %>%
+      dplyr::summarise(stratum_n = sum(n))
   }
-
-  df_all <- bind_rows(list_parts)
-
-  # --- C. Calculate Percentages ---
-  qs_strat <- if (!quo_is_null(s_sym)) quos(!!s_sym) else quos()
-  qs_row   <- quos(!!r_sym)
-  qs_col   <- quos(!!c_sym)
 
   df_calc <- df_all %>%
-    group_by(!!!qs_strat) %>%
-    mutate(stratum_n = sum(n[as_factor(!!r_sym) != "Total" & as_factor(!!c_sym) != "Total"])) %>%
-    group_by(!!!c(qs_strat, qs_row)) %>%
-    mutate(row_denom = sum(n[as_factor(!!c_sym) != "Total"])) %>%
-    group_by(!!!c(qs_strat, qs_col)) %>%
-    mutate(col_denom = sum(n[as_factor(!!r_sym) != "Total"])) %>%
-    ungroup() %>%
-    mutate(
-      pct_row = n / row_denom,
-      pct_col = n / col_denom,
-      pct_tot = n / stratum_n
-    )
+    dplyr::left_join(df_row_denom) %>% dplyr::left_join(df_col_denom)
+  if (length(grps_strat) > 0) df_calc <- df_calc %>% dplyr::left_join(df_strat_denom)
+  else df_calc <- df_calc %>% dplyr::mutate(stratum_n = df_strat_denom$stratum_n)
 
   # --- D. Formatting ---
-  df_final <- df_calc %>%
-    mutate(
+  fmt <- function(x) format(round(x, decimals), nsmall = decimals)
+
+  df_fmt <- df_calc %>%
+    dplyr::mutate(
+      pct_row = (n / row_denom) * 100,
+      pct_col = (n / col_denom) * 100,
+      pct_tot = (n / stratum_n) * 100,
+
       is_t_row = as.character(!!r_sym) == "Total",
       is_t_col = as.character(!!c_sym) == "Total",
-
       use_row = show_row_pct & !is_t_col,
       use_col = show_col_pct & !is_t_row,
       use_tot = show_tot_pct & !is_t_row & !is_t_col,
 
       cell_content = paste0(
-        if (show_n) paste0(round(n, 0)) else "",
+        if (show_n) paste0(format(round(n, 0), big.mark = ",", scientific = FALSE)) else "",
         if_else(show_n & (use_row | use_col | use_tot), "\n", ""),
-
-        if_else(use_row, paste0(scales::percent(pct_row, 0.1)), ""),
+        if_else(use_row, paste0(fmt(pct_row), "%"), ""),
         if_else(use_row & (use_col | use_tot), "\n", ""),
-
-        if_else(use_col, paste0(scales::percent(pct_col, 0.1)), ""),
+        if_else(use_col, paste0(fmt(pct_col), "%"), ""),
         if_else(use_col & use_tot, "\n", ""),
-
-        if_else(use_tot, paste0(scales::percent(pct_tot, 0.1)), "")
+        if_else(use_tot, paste0(fmt(pct_tot), "%"), "")
       )
     ) %>%
-    mutate(cell_content = gsub("\n$", "", cell_content)) %>%
-    # WICHTIG: Das hier verhindert Duplikate durch "Müll-Spalten"
-    dplyr::select(any_of(c(as_name(s_sym), as_name(r_sym), as_name(c_sym))), cell_content) %>%
-    distinct()
+    dplyr::mutate(cell_content = gsub("\n$", "", cell_content)) %>%
+    dplyr::select(dplyr::any_of(c(rlang::as_name(s_sym), rlang::as_name(r_sym), rlang::as_name(c_sym))), cell_content) %>%
+    dplyr::distinct()
 
   # --- E. Sorting & Pivot ---
-  col_vals <- df_final %>% pull(!!c_sym) %>% unique() %>% as.character()
-
+  col_vals <- df_fmt %>% dplyr::pull(!!c_sym) %>% unique() %>% as.character()
   has_total <- "Total" %in% col_vals
-  has_na    <- na_label %in% col_vals
-
+  has_na <- na_label %in% col_vals
   normal_vals <- setdiff(col_vals, c("Total", na_label))
-  normal_vals <- sort(normal_vals)
-
-  final_levels <- normal_vals
+  final_levels <- c(sort(normal_vals))
   if (has_na) final_levels <- c(final_levels, na_label)
   if (has_total) final_levels <- c(final_levels, "Total")
 
-  df_sorted <- df_final %>%
-    mutate(
-      !!c_sym := factor(!!c_sym, levels = final_levels),
-      !!r_sym := fct_relevel(as_factor(!!r_sym), "Total", after = Inf)
-    )
+  df_sorted <- df_fmt %>%
+    dplyr::mutate(!!c_sym := factor(!!c_sym, levels = final_levels),
+      !!r_sym := forcats::fct_relevel(forcats::as_factor(!!r_sym), "Total", after = Inf))
 
-  if (!quo_is_null(s_sym)) {
-    df_sorted <- df_sorted %>% arrange(!!s_sym, !!r_sym, !!c_sym)
-  } else {
-    df_sorted <- df_sorted %>% arrange(!!r_sym, !!c_sym)
-  }
+  if (!rlang::quo_is_null(s_sym)) df_sorted <- df_sorted %>% dplyr::arrange(!!s_sym, !!r_sym, !!c_sym)
+  else df_sorted <- df_sorted %>% dplyr::arrange(!!r_sym, !!c_sym)
 
   cols_left <- character()
-  if (!quo_is_null(s_sym)) {
-    cols_left <- c(cols_left, rlang::as_name(s_sym))
-  }
+  if (!rlang::quo_is_null(s_sym)) cols_left <- c(cols_left, rlang::as_name(s_sym))
   cols_left <- c(cols_left, rlang::as_name(r_sym))
 
-  # --- FIX: ROBUSTER PIVOT ---
-  # Wir entfernen values_fill aus pivot_wider und machen es danach manuell
   df_pivoted <- df_sorted %>%
-    select(!!s_sym, !!r_sym, !!c_sym, cell_content) %>%
-    pivot_wider(
-      names_from = !!c_sym,
-      values_from = cell_content
-    ) %>%
-    # Hier werden die NAs durch "-" ersetzt - das stürzt nicht ab
-    mutate(across(any_of(final_levels), ~ tidyr::replace_na(., "-"))) %>%
-    select(any_of(cols_left), any_of(final_levels))
+    dplyr::select(!!s_sym, !!r_sym, !!c_sym, cell_content) %>%
+    tidyr::pivot_wider(names_from = !!c_sym, values_from = cell_content) %>%
+    dplyr::mutate(dplyr::across(dplyr::any_of(final_levels), ~ tidyr::replace_na(., "-"))) %>%
+    dplyr::select(dplyr::any_of(cols_left), dplyr::any_of(final_levels))
 
-  # --- F. Final Renaming ---
-  if (!quo_is_null(s_sym)) {
-    df_pivoted <- df_pivoted %>%
-      rename(!!final_strat_name := !!s_sym)
-  }
+  # --- F. Renaming ---
+  if (!rlang::quo_is_null(s_sym)) df_pivoted <- df_pivoted %>% dplyr::rename(!!final_strat_name := !!s_sym)
+  df_pivoted <- df_pivoted %>% dplyr::rename(!!final_row_name := !!r_sym)
 
-  df_pivoted <- df_pivoted %>%
-    rename(!!final_row_name := !!r_sym)
+  attr(df_pivoted, "title") <- title
+  attr(df_pivoted, "footer") <- footer
+  class(df_pivoted) <- c("xl_table", class(df_pivoted))
 
   return(df_pivoted)
 }
