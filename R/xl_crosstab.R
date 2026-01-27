@@ -150,7 +150,6 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
   # --- D. Formatting ---
   fmt <- function(x) format(round(x, decimals), nsmall = decimals)
 
-  # BUGFIX: Dynamische Spaltenauswahl für select() erstellen
   cols_to_keep <- c(rlang::as_name(r_sym), rlang::as_name(c_sym))
   if (!rlang::quo_is_null(s_sym)) cols_to_keep <- c(rlang::as_name(s_sym), cols_to_keep)
 
@@ -177,16 +176,29 @@ xl_crosstab <- function(df, row_var, col_var = NULL, strat_var = NULL, w_var = N
       )
     ) %>%
     dplyr::mutate(cell_content = gsub("\n$", "", cell_content)) %>%
-    # HIER WAR DER FEHLER: Wir nehmen nur cols_to_keep (die wir oben geprüft haben)
     dplyr::select(dplyr::any_of(cols_to_keep), cell_content) %>%
     dplyr::distinct()
 
-  # --- E. Sorting & Pivot ---
+  # --- E. Sorting & Pivot (FIXED: Respect Factor Levels) ---
+
+  # 1. Original-Reihenfolge abfragen
+  orig_col_data <- dplyr::pull(df, !!c_sym)
+  if (is.factor(orig_col_data)) {
+    target_levels <- levels(orig_col_data)
+  } else {
+    target_levels <- sort(unique(as.character(orig_col_data)))
+  }
+
   col_vals <- df_fmt %>% dplyr::pull(!!c_sym) %>% unique() %>% as.character()
   has_total <- "Total" %in% col_vals
   has_na <- na_label %in% col_vals
+
   normal_vals <- setdiff(col_vals, c("Total", na_label))
-  final_levels <- c(sort(normal_vals))
+
+  # 2. Sortieren nach Original-Reihenfolge (match)
+  # Wir nutzen match, um die Position jedes normal_vals in target_levels zu finden
+  final_levels <- normal_vals[order(match(normal_vals, target_levels))]
+
   if (has_na) final_levels <- c(final_levels, na_label)
   if (has_total) final_levels <- c(final_levels, "Total")
 
